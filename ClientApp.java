@@ -1,78 +1,56 @@
 import java.io.*;
 import java.net.Socket;
 import java.util.Scanner;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 
 /**
- * A Chat Client.
- * This class can be compiled and run independently of the server project.
+ * A simplified, robust Chat Client for the thoughtstorm06 server.
  */
 public class ClientApp {
     private static volatile boolean isRunning = true;
 
     public static void main(String[] args) {
-        // Configuration: Localhost for same machine, or use Server IP address
         String host = "localhost";
-        int port = 8080; 
+        int port = 8080;
 
-        try (Socket socket = new Socket(host, port)) {
-            System.out.println("--- Connected to Chat Server on " + host + ":" + port + " ---");
+        try (Socket socket = new Socket(host, port);
+             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+             Scanner console = new Scanner(System.in)) {
 
-            // Independent I/O setup using standard Java classes
-            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-            Scanner console = new Scanner(System.in);
+            System.out.println("=== Connected to Chat Server ===");
 
-            // THREAD 1: RECEIVER (Handles incoming stream)
+            // THREAD 1: Listen for messages from the server
             Thread receiver = new Thread(() -> {
                 try {
-                    String msg;
-                    while (isRunning && (msg = in.readLine()) != null) {
-                        String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
-                        System.out.println("\n[" + time + "] Server: " + msg);
-                        System.out.print("> "); 
+                    String serverMessage;
+                    while (isRunning && (serverMessage = in.readLine()) != null) {
+                        // Print server messages directly without the ">" prefix
+                        System.out.println(serverMessage);
                     }
                 } catch (IOException e) {
-                    if (isRunning) {
-                        System.out.println("\n[System] Connection to server closed.");
-                    }
+                    if (isRunning) System.out.println("[System] Lost connection to server.");
                 }
             });
-
-            // THREAD 2: SENDER (Handles user keyboard input)
-            Thread sender = new Thread(() -> {
-                try {
-                    while (isRunning) {
-                        if (console.hasNextLine()) {
-                            String input = console.nextLine();
-                            if ("exit".equalsIgnoreCase(input) || "8".equals(input)) {
-                                isRunning = false;
-                                out.println("8"); // Signal server for disconnect
-                                break;
-                            }
-                            out.println(input);
-                        }
-                    }
-                } catch (Exception e) {
-                    isRunning = false;
-                }
-            });
-
             receiver.start();
-            sender.start();
 
-            // Wait for threads to finish
-            receiver.join();
-            sender.join();
-            
-            System.out.println("Client closed. Goodbye!");
+            // THREAD 2: Main thread handles keyboard input
+            while (isRunning) {
+                if (console.hasNextLine()) {
+                    String input = console.nextLine();
+                    out.println(input);
+
+                    // If user chooses exit (choice 8 or typing 'exit')
+                    if ("8".equals(input) || "exit".equalsIgnoreCase(input)) {
+                        isRunning = false;
+                    }
+                }
+            }
+
+            System.out.println("Disconnecting... Goodbye!");
+            socket.close(); // Ensure socket is closed
 
         } catch (IOException e) {
-            System.err.println("Error: Could not connect to server. Ensure it is running on port " + port);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            System.err.println("Client was interrupted.");
+            System.err.println("Could not connect to server. Is it running?");
         }
     }
 }
