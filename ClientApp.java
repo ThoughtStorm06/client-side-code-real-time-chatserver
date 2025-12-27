@@ -39,8 +39,7 @@ public class ClientApp {
                     String input = console.nextLine();
                     out.println(input);
 
-                    // If user chooses exit (choice 8 or typing 'exit')
-                    if ("8".equals(input) || "exit".equalsIgnoreCase(input)) {
+                    if ("<1_1>".equals(input)) {
                         isRunning = false;
                     }
                 }
